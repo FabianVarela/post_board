@@ -1,7 +1,9 @@
-import 'package:firebase_database/firebase_database.dart';
-import 'package:firebase_database/ui/firebase_animated_list.dart';
 import 'package:flutter/material.dart';
-import 'package:post_board/model/post.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+final GoogleSignIn _googleSignIn = GoogleSignIn();
 
 void main() => runApp(MyApp());
 
@@ -23,111 +25,89 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  List<Post> postMessages = List();
-  Post post;
-
-  final FirebaseDatabase database = FirebaseDatabase.instance;
-  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-
-  DatabaseReference databaseReference;
-
-  @override
-  void initState() {
-    super.initState();
-
-    post = Post("", "");
-    databaseReference = database.reference().child("post_board");
-    databaseReference.onChildAdded.listen(_onEntryAdded);
-    databaseReference.onChildChanged.listen(_onEntryChanged);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Board"),
-      ),
-      body: Column(
-        children: <Widget>[
-          Flexible(
-            flex: 0,
-            child: Center(
-              child: Form(
-                key: formKey,
-                child: Flex(
-                  direction: Axis.vertical,
-                  children: <Widget>[
-                    ListTile(
-                        leading: Icon(Icons.subject),
-                        title: TextFormField(
-                            initialValue: "",
-                            onSaved: (value) => post.subject = value,
-                            validator: (value) => value == "" ? value : null)),
-                    ListTile(
-                        leading: Icon(Icons.message),
-                        title: TextFormField(
-                            initialValue: "",
-                            onSaved: (value) => post.body = value,
-                            validator: (value) => value == "" ? value : null)),
-                    FlatButton(
-                      child: Text("Save"),
-                      color: Colors.redAccent,
-                      onPressed: () {
-                        _submitPostForm();
-                      },
-                    )
-                  ],
+        appBar: AppBar(
+          title: Text("Log In"),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Padding(
+                padding: EdgeInsets.all(8),
+                child: FlatButton(
+                  color: Colors.red,
+                  child: Text("Google Sign In"),
+                  onPressed: () => _signInGoogle(),
                 ),
               ),
-            ),
+              Padding(
+                padding: EdgeInsets.all(8),
+                child: FlatButton(
+                  color: Colors.orange,
+                  child: Text("Sign In with Email"),
+                  onPressed: () => _signInWithEmail(),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.all(8),
+                child: FlatButton(
+                  color: Colors.purple,
+                  child: Text("Create account"),
+                  onPressed: () => _createUser(),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.all(8),
+                child: FlatButton(
+                  color: Colors.green,
+                  child: Text("Sign Out"),
+                  onPressed: () => _signOut(),
+                ),
+              )
+            ],
           ),
-          Padding(padding: EdgeInsets.only(top: 10, bottom: 10)),
-          Flexible(
-            child: FirebaseAnimatedList(
-                query: databaseReference,
-                itemBuilder: (_, DataSnapshot snapshot,
-                    Animation<double> animation, int index) {
-                  return Card(
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.red,
-                      ),
-                      title: Text(postMessages[index].subject),
-                      subtitle: Text(postMessages[index].body),
-                    ),
-                  );
-                }),
-          )
-        ],
-      ),
-    );
+        ));
   }
 
-  void _onEntryAdded(Event event) {
-    setState(() {
-      postMessages.add(Post.fromSnapshot(event.snapshot));
+  Future<FirebaseUser> _signInGoogle() async {
+    GoogleSignInAccount googleSignInAccount = await _googleSignIn.signIn();
+    GoogleSignInAuthentication googleSignInAuthentication =
+        await googleSignInAccount.authentication;
+
+    AuthCredential credential = GoogleAuthProvider.getCredential(
+        idToken: googleSignInAuthentication.idToken,
+        accessToken: googleSignInAuthentication.accessToken);
+
+    FirebaseUser user = await _firebaseAuth.signInWithCredential(credential);
+
+    print("User is ${user.displayName}");
+
+    return user;
+  }
+
+  Future _createUser() async {
+    await _firebaseAuth
+        .createUserWithEmailAndPassword(
+            email: "fvarela@smarttaxi.com", password: "Jfabian920330")
+        .then((user) {
+      print("User created: ${user.displayName}");
+      print("Email: ${user.email}");
     });
   }
 
-  void _submitPostForm() {
-    final FormState state = formKey.currentState;
-
-    if (state.validate()) {
-      state.save();
-      state.reset();
-
-      databaseReference.push().set(post.toJson());
-    }
+  void _signOut() {
+    _googleSignIn.signOut();
   }
 
-  void _onEntryChanged(Event event) {
-    var oldData = postMessages.singleWhere((entry) {
-      return entry.key == event.snapshot.key;
-    });
-
-    setState(() {
-      postMessages[postMessages.indexOf(oldData)] =
-          Post.fromSnapshot(event.snapshot);
+  void _signInWithEmail() {
+    _firebaseAuth
+        .signInWithEmailAndPassword(
+            email: "fvarela@smarttaxi.com", password: "Jfabian920330")
+        .then((user) {
+      print("User signed in: ${user.email}");
     });
   }
 }
